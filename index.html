@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>منصة مستر يحيى البنا - رياضيات المحلة</title>
-    
-    <!-- مكتبات Firebase اللحظية -->
+    <!-- مكتبات الفايربيز -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -250,6 +249,23 @@
             color: white;
         }
 
+        .fullscreen-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .fullscreen-btn:hover {
+            background: #0b7dda;
+        }
+
         .live-box {
             background: #1a1a1a;
             border: 2px dashed #444;
@@ -464,7 +480,6 @@
 
         <!-- Portal Section -->
         <div id="portal-section" style="display: none;">
-            <!-- Tab Contents Container -->
             <div id="tab-contents-container"></div>
         </div>
     </div>
@@ -478,59 +493,44 @@
         </div>
     </footer>
 
-        <script>
-        // --- 1. إعدادات وتفعيل Firebase الخاص بمشروعك ---
-        const firebaseConfig = {
-          apiKey: "AIzaSyAeyXXbVMg1l5GF9sQ7eNVOOH5rqIAeM5A",
-          authDomain: "yahya-al-banna----math2026.firebaseapp.com",
-          projectId: "yahya-al-banna----math2026",
-          storageBucket: "yahya-al-banna----math2026.firebasestorage.app",
-          messagingSenderId: "100901042085",
-          appId: "1:100901042085:web:e1de66ff6b40e7d7585a4c",
-          measurementId: "G-JTHCEY45SX"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
+    <script>
         const teacherCode = "YAHIYA2026";
+        
+        if (!localStorage.getItem('yahiya_codes')) {
+            localStorage.setItem('yahiya_codes', JSON.stringify([
+                { code: "YB-1001", status: "active" },
+                { code: "YB-2026", status: "active" },
+                { code: "MATH505", status: "active" }
+            ]));
+        }
+        if (!localStorage.getItem('yahiya_videos')) {
+            localStorage.setItem('yahiya_videos', JSON.stringify([]));
+        }
+        if (!localStorage.getItem('yahiya_live')) {
+            localStorage.setItem('yahiya_live', JSON.stringify({ 
+                active: false, 
+                type: "group", 
+                targetStudents: [] 
+            }));
+        }
+        if (!localStorage.getItem('yahiya_online')) {
+            localStorage.setItem('yahiya_online', JSON.stringify([]));
+        }
+        if (!localStorage.getItem('yahiya_chat_settings')) {
+            localStorage.setItem('yahiya_chat_settings', JSON.stringify({
+                groupChatEnabled: true 
+            }));
+        }
+        if (!localStorage.getItem('yahiya_messages')) {
+            localStorage.setItem('yahiya_messages', JSON.stringify([])); 
+        }
+
         let currentUser = null;
         let isUserTeacher = false;
         let localStream = null;
         let activeChatTarget = 'group';
 
-        // المتغيرات اللحظية من Firebase
-        let firebaseCodes = [];
-        let firebaseOnline = [];
-        let firebaseMessages = [];
-        let firebaseChatSettings = { groupChatEnabled: true };
-
         window.onload = function() {
-            // الاستماع اللحظي للبيانات من السيرفر
-            database.ref("codes").on("value", snapshot => {
-                firebaseCodes = snapshot.val() ? Object.values(snapshot.val()) : [
-                    { code: "YB-1001", status: "active" },
-                    { code: "YB-2026", status: "active" },
-                    { code: "MATH505", status: "active" }
-                ];
-                refreshPortalData();
-            });
-
-            database.ref("online").on("value", snapshot => {
-                firebaseOnline = snapshot.val() ? Object.values(snapshot.val()) : [];
-                refreshPortalData();
-            });
-
-            database.ref("messages").on("value", snapshot => {
-                firebaseMessages = snapshot.val() ? Object.values(snapshot.val()) : [];
-                renderChatMessages();
-            });
-
-            database.ref("chat_settings").on("value", snapshot => {
-                if (snapshot.val()) firebaseChatSettings = snapshot.val();
-                refreshPortalData();
-            });
-
             const savedUser = JSON.parse(localStorage.getItem('yahiya_current_user'));
             if (savedUser) {
                 currentUser = savedUser;
@@ -541,6 +541,7 @@
                 document.getElementById('bottom-nav-container').style.display = 'flex';
 
                 setupPortal();
+                setInterval(refreshPortalData, 2000); 
             }
         };
 
@@ -550,10 +551,11 @@
             const phone = document.getElementById('phone').value;
             const code = document.getElementById('code').value;
 
+            const codesData = JSON.parse(localStorage.getItem('yahiya_codes'));
             const isTeacher = (code === teacherCode);
 
             if (!isTeacher) {
-                const foundCode = firebaseCodes.find(c => c.code === code);
+                const foundCode = codesData.find(c => c.code === code);
                 if (!foundCode) {
                     alert('عذراً، كود الدخول غير صحيح! تأكد من الكود المخصص لك.');
                     return;
@@ -573,8 +575,10 @@
 
             localStorage.setItem('yahiya_current_user', JSON.stringify(currentUser));
 
-            // تحديث المتواجدين أونلاين لحظياً في الفايربيز
-            database.ref("online/" + phone.replace(/[^0-9]/g, "")).set(currentUser);
+            let onlineUsers = JSON.parse(localStorage.getItem('yahiya_online')) || [];
+            onlineUsers = onlineUsers.filter(u => u.phone !== phone);
+            onlineUsers.push(currentUser);
+            localStorage.setItem('yahiya_online', JSON.stringify(onlineUsers));
 
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('portal-section').style.display = 'block';
@@ -585,7 +589,9 @@
 
         function logoutUser() {
             if (currentUser) {
-                database.ref("online/" + currentUser.phone.replace(/[^0-9]/g, "")).remove();
+                let onlineUsers = JSON.parse(localStorage.getItem('yahiya_online')) || [];
+                onlineUsers = onlineUsers.filter(u => u.phone !== currentUser.phone);
+                localStorage.setItem('yahiya_online', JSON.stringify(onlineUsers));
             }
             localStorage.removeItem('yahiya_current_user');
             location.reload();
@@ -606,8 +612,8 @@
 
                 contentsContainer.innerHTML = `
                     <div id="teacher-videos" class="tab-content active">
-                        <h3>رفع الفيديوهات التعليمية للمنصة</h3>
-                        <p style="color:var(--text-gray); margin: 10px 0 20px;">اختر الفيديو من جهازك مع كتابة عنوان ووصف ليظهر للطلاب.</p>
+                        <h3>نشر الفيديوهات والحصص للمنصة</h3>
+                        <p style="color:var(--text-gray); margin: 10px 0 20px;">اكتب عنوان الدرس ووصفه، ثم حط رابط الفيديو المباشر (مثل روابط تيليجرام أو روابط مباشرة) ليظهر للطلاب مع زر تكبير الشاشة.</p>
                         <div class="form-group">
                             <input type="text" id="vidTitle" placeholder="عنوان الدرس (مثال: حصة التفاضل)">
                         </div>
@@ -615,25 +621,42 @@
                             <input type="text" id="vidDesc" placeholder="وصف صغير تحت الفيديو">
                         </div>
                         <div class="form-group">
-                            <label>اختر ملف الفيديو من جهازك:</label>
-                            <input type="file" id="videoFile" accept="video/*" style="background:#222; padding:10px;">
+                            <label>رابط الفيديو المباشر (تيليجرام أو رابط مباشر):</label>
+                            <input type="text" id="videoUrlInput" placeholder="https://..." style="background:#222; padding:12px;">
                         </div>
-                        <button class="btn" onclick="uploadVideoFromFile()">رفع ونشر الفيديو للمنصة 🚀</button>
+                        <button class="btn" onclick="uploadVideoFromFile()">نشر الفيديو للمنصة 🚀</button>
 
                         <h3 style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">الفيديوهات المرفوعة:</h3>
                         <div class="video-feed" id="teacher-videos-feed" style="margin-top: 15px;"></div>
                     </div>
 
                     <div id="teacher-live" class="tab-content">
-                        <h3>استوديو البث المباشر</h3>
-                        <p style="color:var(--text-gray); margin: 10px 0 15px;">اختر نوع البث وابدأ المباشر فوراً.</p>
+                        <h3>استوديو البث المباشر (صوت وصورة عالية الجودة)</h3>
+                        <p style="color:var(--text-gray); margin: 10px 0 15px;">اختر نوع البث (جماعي أو فردي لطلاب محددين) وابدأ البث مباشرة.</p>
+                        
+                        <div class="settings-box">
+                            <div class="form-group">
+                                <label>نوع البث المباشر:</label>
+                                <select id="liveTypeSelect" onchange="toggleLiveTargetSelection()">
+                                    <option value="group">بث جماعي (لكل الطلاب)</option>
+                                    <option value="private">بث فردي / مخصص (لطالب أو طلاب معينين)</option>
+                                </select>
+                            </div>
+                            <div id="privateLiveStudentsContainer" style="display:none; margin-top:10px;">
+                                <label style="display:block; margin-bottom:5px; color:var(--text-gray);">اختر الطلاب المشاركين في البث الفردي:</label>
+                                <div id="studentsCheckboxList" style="max-height:120px; overflow-y:auto; background:#141414; padding:8px; border-radius:4px;"></div>
+                            </div>
+                        </div>
+
                         <div style="margin-bottom: 15px;">
                             <video id="teacherWebcam" autoplay playsinline muted class="live-stream-screen"></video>
                         </div>
+
                         <div style="display: flex; gap: 10px;">
                             <button class="btn" style="background-color: #2196F3;" onclick="startTeacherCameraLive()">بدء البث بالكاميرا 🔴</button>
                             <button class="btn" style="background-color: #f44336;" onclick="stopTeacherCameraLive()">إيقاف البث ⏹</button>
                         </div>
+                        <p id="live-status-text" style="margin-top: 15px; font-weight: bold;"></p>
                     </div>
 
                     <div id="teacher-chat" class="tab-content" style="padding: 10px;">
@@ -661,15 +684,19 @@
 
                     <div id="teacher-codes" class="tab-content">
                         <h3>إدارة الأكواد السرية للطلاب</h3>
-                        <p style="color:var(--text-gray); margin: 10px 0 15px;">توليد وإدارة حالة الأكواد:</p>
+                        <p style="color:var(--text-gray); margin: 10px 0 15px;">توليد وإدارة حالة الأكواد (إيقاف مؤقت أو طرد نهائي):</p>
                         <button class="btn" style="max-width: 250px;" onclick="generateStudentCode()">توليد كود جديد 🔑</button>
                         <div id="generated-code-box" style="margin-top: 15px; font-size: 16px; color: var(--primary-red); font-weight: bold;"></div>
+                        
                         <h4 style="margin-top: 25px; margin-bottom: 10px;">قائمة الأكواد وحالتها:</h4>
                         <div id="codes-management-list" style="margin-top: 10px;"></div>
                     </div>
 
                     <div id="teacher-online" class="tab-content">
-                        <h3>الطلاب المتواجدين الآن على المنصة</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0;">الطلاب المتواجدين الآن على المنصة</h3>
+                            <button class="logout-btn" style="color: #4CAF50; border-color: #4CAF50; padding: 8px 14px;" onclick="refreshOnlineListManually()">تحديث القائمة 🔄</button>
+                        </div>
                         <ul class="online-list" id="teacher-online-list"></ul>
                     </div>
                 `;
@@ -722,17 +749,111 @@
 
             if(event && event.currentTarget) {
                 event.currentTarget.classList.add('active');
+            } else {
+                navItems.forEach(item => {
+                    if(item.getAttribute('onclick').includes(tabId)) item.classList.add('active');
+                });
             }
             document.getElementById(tabId).classList.add('active');
         }
 
+        function uploadVideoFromFile() {
+            const title = document.getElementById('vidTitle').value;
+            const desc = document.getElementById('vidDesc').value;
+            const urlInput = document.getElementById('videoUrlInput').value.trim();
+
+            if (!title || !urlInput) {
+                alert('الرجاء كتابة العنوان ووضع رابط الفيديو المباشر.');
+                return;
+            }
+
+            let videos = JSON.parse(localStorage.getItem('yahiya_videos')) || [];
+            videos.push({ id: Date.now(), title, desc, url: urlInput });
+            localStorage.setItem('yahiya_videos', JSON.stringify(videos));
+
+            document.getElementById('vidTitle').value = '';
+            document.getElementById('vidDesc').value = '';
+            document.getElementById('videoUrlInput').value = '';
+            
+            alert('تم نشر الفيديو على المنصة بنجاح لجميع الطلاب! 🚀');
+            refreshPortalData();
+        }
+
+        function deleteContent(id) {
+            let videos = JSON.parse(localStorage.getItem('yahiya_videos')) || [];
+            videos = videos.filter(item => item.id !== id);
+            localStorage.setItem('yahiya_videos', JSON.stringify(videos));
+            refreshPortalData();
+        }
+
+        function toggleFullscreen(videoId) {
+            const videoEl = document.getElementById(videoId);
+            if (videoEl.requestFullscreen) {
+                videoEl.requestFullscreen();
+            } else if (videoEl.webkitRequestFullscreen) {
+                videoEl.webkitRequestFullscreen();
+            } else if (videoEl.msRequestFullscreen) {
+                videoEl.msRequestFullscreen();
+            }
+        }
+
+        function refreshOnlineListManually() {
+            refreshPortalData();
+            alert('تم تحديث قائمة الطلاب المتواجدين بنجاح!');
+        }
+
+        function toggleLiveTargetSelection() {
+            const type = document.getElementById('liveTypeSelect').value;
+            const container = document.getElementById('privateLiveStudentsContainer');
+            if (type === 'private') {
+                container.style.display = 'block';
+                populateStudentsCheckboxList();
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        function populateStudentsCheckboxList() {
+            const onlineUsers = JSON.parse(localStorage.getItem('yahiya_online')) || [];
+            const filteredUsers = onlineUsers.filter(u => u.role !== "المعلم");
+            const listEl = document.getElementById('studentsCheckboxList');
+            if(!listEl) return;
+            listEl.innerHTML = '';
+            if(filteredUsers.length === 0) {
+                listEl.innerHTML = '<p style="color:var(--text-gray); font-size:13px;">لا يوجد طلاب متواجدين حالياً.</p>';
+                return;
+            }
+            filteredUsers.forEach(u => {
+                listEl.innerHTML += `
+                    <label style="display:block; color:#fff; font-size:13px; margin-bottom:5px; cursor:pointer;">
+                        <input type="checkbox" value="${u.phone}" class="live-target-checkbox"> ${u.name} (${u.phone})
+                    </label>
+                `;
+            });
+        }
+
         async function startTeacherCameraLive() {
             try {
+                const type = document.getElementById('liveTypeSelect').value;
+                let targetStudents = [];
+                if (type === 'private') {
+                    const checkboxes = document.querySelectorAll('.live-target-checkbox:checked');
+                    checkboxes.forEach(cb => targetStudents.push(cb.value));
+                    if (targetStudents.length === 0) {
+                        alert('الرجاء اختيار طالب واحد على الأقل للبث الفردي المخصص.');
+                        return;
+                    }
+                }
+
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById('teacherWebcam').srcObject = localStream;
+                const webcamElement = document.getElementById('teacherWebcam');
+                webcamElement.srcObject = localStream;
+
+                localStorage.setItem('yahiya_live', JSON.stringify({ active: true, type, targetStudents }));
                 alert('تم فتح الكاميرا وبدء البث المباشر بنجاح!');
+                refreshPortalData();
             } catch (error) {
-                alert('عذراً، لم نتمكن من الوصول للكاميرا.');
+                alert('عذراً، لم نتمكن من الوصول للكاميرا. تأكد من السماح للأذونات من المتصفح.');
             }
         }
 
@@ -741,28 +862,65 @@
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
             }
-            document.getElementById('teacherWebcam').srcObject = null;
+            const webcamElement = document.getElementById('teacherWebcam');
+            if (webcamElement) webcamElement.srcObject = null;
+
+            localStorage.setItem('yahiya_live', JSON.stringify({ active: false, type: "group", targetStudents: [] }));
             alert('تم إيقاف البث المباشر.');
+            refreshPortalData();
         }
 
         function generateStudentCode() {
+            let codes = JSON.parse(localStorage.getItem('yahiya_codes')) || [];
             const newCode = 'YB-' + Math.floor(1000 + Math.random() * 9000);
-            database.ref("codes/" + newCode).set({ code: newCode, status: "active" });
+            codes.push({ code: newCode, status: "active" });
+            localStorage.setItem('yahiya_codes', JSON.stringify(codes));
             document.getElementById('generated-code-box').innerText = `تم توليد الكود الجديد: ${newCode}`;
+            refreshPortalData();
         }
 
         function updateCodeStatus(codeVal, action) {
-            database.ref("codes/" + codeVal).update({ status: action });
+            let codes = JSON.parse(localStorage.getItem('yahiya_codes')) || [];
+            codes = codes.map(c => {
+                if (c.code === codeVal) {
+                    if (action === 'active') c.status = 'active';
+                    else if (action === 'suspended') c.status = 'suspended';
+                    else if (action === 'banned') c.status = 'banned';
+                }
+                return c;
+            });
+            localStorage.setItem('yahiya_codes', JSON.stringify(codes));
+            refreshPortalData();
+        }
+
+        function banStudentByPhone(studentPhone) {
+            let codes = JSON.parse(localStorage.getItem('yahiya_codes')) || [];
+            let onlineUsers = JSON.parse(localStorage.getItem('yahiya_online')) || [];
+            const targetUser = onlineUsers.find(u => u.phone === studentPhone);
+            if (targetUser) {
+                codes = codes.map(c => {
+                    if (c.code === targetUser.codeUsed) {
+                        c.status = 'banned';
+                    }
+                    return c;
+                });
+                localStorage.setItem('yahiya_codes', JSON.stringify(codes));
+                onlineUsers = onlineUsers.filter(u => u.phone !== studentPhone);
+                localStorage.setItem('yahiya_online', JSON.stringify(onlineUsers));
+                alert(`تم طرد الطالب ${targetUser.name} نهائياً ولن يتمكن من الدخول مجدداً.`);
+                refreshPortalData();
+            }
         }
 
         function updateGroupChatSettings() {
             const enabled = document.getElementById('groupChatToggle').checked;
-            database.ref("chat_settings").set({ groupChatEnabled: enabled });
+            localStorage.setItem('yahiya_chat_settings', JSON.stringify({ groupChatEnabled: enabled }));
         }
 
         function switchChatTarget(target, element) {
             activeChatTarget = target;
-            document.querySelectorAll('.chat-contact-pill').forEach(p => p.classList.remove('active'));
+            const pills = document.querySelectorAll('.chat-contact-pill');
+            pills.forEach(p => p.classList.remove('active'));
             if(element) element.classList.add('active');
 
             const titleEl = document.getElementById('current-chat-title');
@@ -776,51 +934,69 @@
             renderChatMessages();
         }
 
+        function openPrivateChatBySender(phone, name, role) {
+            activeChatTarget = phone;
+            const titleEl = document.getElementById('current-chat-title');
+            titleEl.innerText = `محادثة خاصة مع: ${name}`;
+
+            const sidebar = document.querySelector('.chat-sidebar-whatsapp');
+            if (!document.getElementById(`pill-${phone}`)) {
+                sidebar.innerHTML += `<div class="chat-contact-pill active" id="pill-${phone}" onclick="switchChatTarget('${phone}', this)">${name}</div>`;
+            } else {
+                document.querySelectorAll('.chat-contact-pill').forEach(p => p.classList.remove('active'));
+                document.getElementById(`pill-${phone}`).classList.add('active');
+            }
+            renderChatMessages();
+        }
+
         function sendChatMessage() {
             const input = document.getElementById('chatInputText');
             if(!input) return;
             const text = input.value.trim();
             if (!text) return;
 
-            if (!isUserTeacher && activeChatTarget === 'group' && !firebaseChatSettings.groupChatEnabled) {
+            const chatSettings = JSON.parse(localStorage.getItem('yahiya_chat_settings')) || { groupChatEnabled: true };
+            if (!isUserTeacher && activeChatTarget === 'group' && !chatSettings.groupChatEnabled) {
                 alert('الشات الجماعي مغلق حالياً كتابةً من قبل المعلم.');
                 return;
             }
 
+            let messages = JSON.parse(localStorage.getItem('yahiya_messages')) || [];
             let recipient = activeChatTarget;
             if (!isUserTeacher && activeChatTarget === 'teacher') {
                 recipient = 'teacher_phone_special'; 
             }
 
-            // رفع الرسالة لحظياً لـ Firebase
-            database.ref("messages").push({
+            messages.push({
                 fromPhone: currentUser.phone,
                 fromName: currentUser.name,
                 fromRole: currentUser.role,
                 to: recipient,
-                text: text,
-                time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+                text,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             });
-
+            localStorage.setItem('yahiya_messages', JSON.stringify(messages));
             input.value = '';
+            renderChatMessages();
         }
 
         function renderChatMessages() {
             const box = document.getElementById('chatMessagesBox');
             if (!box) return;
 
+            const messages = JSON.parse(localStorage.getItem('yahiya_messages')) || [];
             box.innerHTML = '';
-            let filtered = [];
 
+            let filtered = [];
             if (activeChatTarget === 'group') {
-                filtered = firebaseMessages.filter(m => m.to === 'group');
+                filtered = messages.filter(m => m.to === 'group');
             } else if (isUserTeacher) {
-                filtered = firebaseMessages.filter(m => (m.to === activeChatTarget && m.fromPhone === activeChatTarget) || (m.fromPhone === currentUser.phone && m.to === activeChatTarget));
+                filtered = messages.filter(m => (m.to === activeChatTarget && m.fromPhone === activeChatTarget) || (m.fromPhone === currentUser.phone && m.to === activeChatTarget));
             } else {
                 if (activeChatTarget === 'teacher') {
-                    filtered = firebaseMessages.filter(m => m.to === 'teacher_phone_special' || (m.fromRole === 'المعلم' && m.to === currentUser.phone));
+                    filtered = messages.filter(m => m.to === 'teacher_phone_special' || (m.fromRole === 'المعلم' && m.to === currentUser.phone));
                 } else {
-                    filtered = firebaseMessages.filter(m => (m.to === activeChatTarget && m.fromPhone === currentUser.phone) || (m.to === currentUser.phone && m.fromPhone === activeChatTarget));
+                    filtered = messages.filter(m => (m.to === activeChatTarget && m.fromPhone === currentUser.phone) || (m.to === currentUser.phone && m.fromPhone === activeChatTarget));
                 }
             }
 
@@ -836,7 +1012,7 @@
                 box.innerHTML += `
                     <div class="chat-bubble ${isOutgoing ? 'outgoing' : 'incoming'}">
                         ${!isOutgoing ? `
-                            <div class="sender-name">
+                            <div class="sender-name" onclick="openPrivateChatBySender('${m.fromPhone}', '${m.fromName}', '${m.fromRole || 'طالب'}')">
                                 ${m.fromName}${isTeacherSender ? '<span class="verified-badge" title="موثق">✔</span>' : ''}
                             </div>
                         ` : ''}
@@ -851,11 +1027,52 @@
         function refreshPortalData() {
             if (!currentUser) return;
 
+            const codes = JSON.parse(localStorage.getItem('yahiya_codes')) || [];
+            if (!isUserTeacher) {
+                const myCodeObj = codes.find(c => c.code === currentUser.codeUsed);
+                if (myCodeObj && (myCodeObj.status === 'banned' || myCodeObj.status === 'suspended')) {
+                    alert('إمشي يا مطرود! تم طردك نهائياً من المنصة ولا يمكنك الدخول.');
+                    logoutUser();
+                    return;
+                }
+            }
+
+            const videos = JSON.parse(localStorage.getItem('yahiya_videos')) || [];
+            const liveData = JSON.parse(localStorage.getItem('yahiya_live')) || { active: false };
+            const onlineUsers = JSON.parse(localStorage.getItem('yahiya_online')) || [];
+            const chatSettings = JSON.parse(localStorage.getItem('yahiya_chat_settings')) || { groupChatEnabled: true };
+
             if (isUserTeacher) {
+                const tFeed = document.getElementById('teacher-videos-feed');
+                if (tFeed) {
+                    tFeed.innerHTML = '';
+                    videos.forEach(item => {
+                        tFeed.innerHTML += `
+                            <div class="video-card">
+                                <div class="video-container">
+                                    <video id="vid-${item.id}" controls src="${item.url}" playsinline></video>
+                                </div>
+                                <div class="video-info">
+                                    <h3>${item.title}</h3>
+                                    <p>${item.desc || ''}</p>
+                                    <button class="fullscreen-btn" onclick="toggleFullscreen('vid-${item.id}')">⛶ تكبير الشاشة</button>
+                                    <button class="delete-btn" onclick="deleteContent(${item.id})">حذف الفيديو</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                const liveStatus = document.getElementById('live-status-text');
+                if (liveStatus) {
+                    liveStatus.innerText = liveData.active ? `حالة البث: يعمل (${liveData.type === 'group' ? 'جماعي' : 'فردي مخصص'}) 🔴` : "حالة البث: متوقف ⏹";
+                    liveStatus.style.color = liveData.active ? "#4CAF50" : "#ff5252";
+                }
+
                 const codesList = document.getElementById('codes-management-list');
                 if (codesList) {
                     codesList.innerHTML = '';
-                    firebaseCodes.forEach(c => {
+                    codes.forEach(c => {
                         codesList.innerHTML += `
                             <div class="code-row">
                                 <span><strong>${c.code}</strong> — الحالة: <span style="color:${c.status==='active'?'#4CAF50':(c.status==='suspended'?'#ff9800':'#ff5252')}">${c.status}</span></span>
@@ -872,26 +1089,105 @@
                 const onlineList = document.getElementById('teacher-online-list');
                 if (onlineList) {
                     onlineList.innerHTML = '';
-                    firebaseOnline.forEach(u => {
-                        onlineList.innerHTML += `
-                            <li class="online-item">
-                                <span><strong>${u.name}</strong> (${u.phone})</span>
-                                <span style="color: #4CAF50; font-weight: bold;">● متصل أونلاين</span>
-                            </li>
+                    if (onlineUsers.length === 0) {
+                        onlineList.innerHTML = '<p style="text-align:center; color:var(--text-gray); padding:20px;">لا توجد طلاب متواجدين الآن..</p>';
+                    } else {
+                        onlineUsers.forEach(u => {
+                            onlineList.innerHTML += `
+                                <li class="online-item">
+                                    <span><strong>${u.name}</strong> ${u.role==='المعلم'?'<span class="verified-badge">✔</span>':''} (${u.phone})</span>
+                                    ${u.role !== 'المعلم' ? `<button class="logout-btn" onclick="banStudentByPhone('${u.phone}')">طرد الطالب ⛔</button>` : '<span style="color: #4CAF50; font-weight: bold;">● متصل</span>'}
+                                </li>
+                            `;
+                        });
+                    }
+                }
+
+                const toggleEl = document.getElementById('groupChatToggle');
+                if (toggleEl && document.activeElement !== toggleEl) {
+                    toggleEl.checked = chatSettings.groupChatEnabled;
+                }
+
+            } else {
+                const sFeed = document.getElementById('student-video-feed');
+                if (sFeed) {
+                    sFeed.innerHTML = '';
+                    if(videos.length === 0) {
+                        sFeed.innerHTML = `<p style="text-align:center; color:var(--text-gray); padding: 30px;">لا توجد فيديوهات منشورة حالياً.</p>`;
+                    }
+                    videos.forEach(item => {
+                        sFeed.innerHTML += `
+                            <div class="video-card">
+                                <div class="video-container">
+                                    <video id="vid-${item.id}" controls src="${item.url}" playsinline></video>
+                                </div>
+                                <div class="video-info">
+                                    <h3>${item.title}</h3>
+                                    <p>${item.desc || ''}</p>
+                                    <button class="fullscreen-btn" onclick="toggleFullscreen('vid-${item.id}')">⛶ تكبير الشاشة</button>
+                                </div>
+                            </div>
                         `;
                     });
                 }
 
-                const toggleEl = document.getElementById('groupChatToggle');
-                if (toggleEl) toggleEl.checked = firebaseChatSettings.groupChatEnabled;
+                const liveBox = document.getElementById('student-live-viewbox');
+                if (liveBox) {
+                    let canViewLive = false;
+                    if (liveData.active) {
+                        if (liveData.type === 'group') {
+                            canViewLive = true;
+                        } else if (liveData.type === 'private' && liveData.targetStudents.includes(currentUser.phone)) {
+                            canViewLive = true;
+                        }
+                    }
 
-            } else {
-                const myCodeObj = firebaseCodes.find(c => c.code === currentUser.codeUsed);
-                if (myCodeObj && (myCodeObj.status === 'banned' || myCodeObj.status === 'suspended')) {
-                    alert('تم تغيير حالة كودك من قبل المعلم.');
-                    logoutUser();
+                    if (canViewLive) {
+                        liveBox.className = "live-box active-live";
+                        liveBox.innerHTML = `
+                            <h3>البث المباشر يعمل الآن! 🔴</h3>
+                            <p style="margin: 10px 0 15px; color: var(--text-gray);">مستر يحيى يبث الحصة صوت وصورة.</p>
+                            <video id="studentLiveView" autoplay playsinline class="live-stream-screen" controls></video>
+                        `;
+                        const studentView = document.getElementById('studentLiveView');
+                        if (localStream && studentView && !studentView.srcObject) {
+                            studentView.srcObject = localStream;
+                        }
+                    } else {
+                        liveBox.className = "live-box";
+                        liveBox.innerHTML = `
+                            <h3>لا يوجد بث مباشر متاح لك حالياً</h3>
+                            <p style="color: var(--text-gray); margin-top: 10px;">سيظهر البث تلقائياً فور بدء المعلم.</p>
+                        `;
+                    }
+                }
+
+                const studentInputContainer = document.getElementById('studentChatInputContainer');
+                if (studentInputContainer) {
+                    if (activeChatTarget === 'group' && !chatSettings.groupChatEnabled) {
+                        studentInputContainer.innerHTML = `<p style="color:#ff5252; font-size:13px; text-align:center; width:100%;">الشات الجماعي مغلق كتابةً من المعلم حالياً.</p>`;
+                    } else if (!studentInputContainer.querySelector('input')) {
+                        studentInputContainer.innerHTML = `
+                            <input type="text" id="chatInputText" placeholder="اكتب رسالتك هنا..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                            <button class="btn" style="width: 90px; background-color: #00a884;" onclick="sendChatMessage()">إرسال</button>
+                        `;
+                    }
                 }
             }
+            renderChatMessages();
+        }
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAeyXXbVMg1l5GF9sQ7eNVOOH5rqIAeM5A",
+            authDomain: "yahya-al-banna----math2026.firebaseapp.com",
+            projectId: "yahya-al-banna----math2026",
+            storageBucket: "yahya-al-banna----math2026.firebasestorage.app",
+            messagingSenderId: "100901042085",
+            appId: "1:100901042085:web:e1de66ff6b40e7d7585a4c",
+            measurementId: "G-JTHCEY45SX"
+        };
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
         }
     </script>
 </body>
