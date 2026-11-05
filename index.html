@@ -212,13 +212,11 @@
             align-items: center;
         }
 
-        .video-container video {
+        .video-container iframe {
             width: 100%;
             height: 100%;
             border: none;
             outline: none;
-            object-fit: contain;
-            background: #000;
         }
 
         .video-info {
@@ -488,9 +486,6 @@
                 { code: "MATH505", status: "active" }
             ]));
         }
-        if (!localStorage.getItem('yahiya_videos')) {
-            localStorage.setItem('yahiya_videos', JSON.stringify([]));
-        }
         if (!localStorage.getItem('yahiya_live')) {
             localStorage.setItem('yahiya_live', JSON.stringify({ 
                 active: false, 
@@ -598,7 +593,7 @@
                 contentsContainer.innerHTML = `
                     <div id="teacher-videos" class="tab-content active">
                         <h3>نشر الفيديوهات والحصص للمنصة</h3>
-                        <p style="color:var(--text-gray); margin: 10px 0 20px;">اكتب عنوان الدرس ووصفه، ثم حط الرابط المباشر لجوجل درايف.</p>
+                        <p style="color:var(--text-gray); margin: 10px 0 20px;">اكتب عنوان الدرس، ثم حط رابط الفيديو (سواء يوتيوب أو رابط مباشر).</p>
                         <div class="form-group">
                             <input type="text" id="vidTitle" placeholder="عنوان الدرس (مثال: حصة التفاضل)">
                         </div>
@@ -606,8 +601,8 @@
                             <input type="text" id="vidDesc" placeholder="وصف صغير تحت الفيديو">
                         </div>
                         <div class="form-group">
-                            <label>رابط الفيديو المباشر:</label>
-                            <input type="text" id="videoUrlInput" placeholder="https://lh3.googleusercontent.com/d/..." style="background:#222; padding:12px;">
+                            <label>رابط الفيديو:</label>
+                            <input type="text" id="videoUrlInput" placeholder="رابط يوتيوب أو الرابط المباشر" style="background:#222; padding:12px;">
                         </div>
                         <button class="btn" onclick="uploadVideoFromFile()">نشر الفيديو للمنصة 🚀</button>
 
@@ -742,33 +737,54 @@
             document.getElementById(tabId).classList.add('active');
         }
 
+        // دالة تحويل أي رابط يوتيوب أو رابط مباشر إلى كود iframe نظيف وسريع
+        function parseEmbedUrl(url) {
+            url = url.trim();
+            // لو رابط يوتيوب عادي
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                let videoId = '';
+                if (url.includes('youtu.be/')) {
+                    videoId = url.split('youtu.be/')[1].split('?')[0];
+                } else if (url.includes('watch?v=')) {
+                    videoId = url.split('watch?v=')[1].split('&')[0];
+                } else if (url.includes('embed/')) {
+                    videoId = url.split('embed/')[1].split('?')[0];
+                }
+                if (videoId) {
+                    return `<iframe src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1" allowfullscreen></iframe>`;
+                }
+            }
+            // لو رابط مباشر عادي (زي catbox أو غيره)
+            return `<iframe src="${url}" allowfullscreen style="width:100%; height:100%; border:none; background:#000;"></iframe>`;
+        }
+
         function uploadVideoFromFile() {
             const title = document.getElementById('vidTitle').value;
             const desc = document.getElementById('vidDesc').value;
             const urlInput = document.getElementById('videoUrlInput').value.trim();
 
             if (!title || !urlInput) {
-                alert('الرجاء كتابة العنوان ووضع الرابط المباشر.');
+                alert('الرجاء كتابة العنوان ووضع الرابط.');
                 return;
             }
 
-            let videos = JSON.parse(localStorage.getItem('yahiya_videos')) || [];
-            videos.push({ id: Date.now(), title, desc, url: urlInput });
-            localStorage.setItem('yahiya_videos', JSON.stringify(videos));
-
-            document.getElementById('vidTitle').value = '';
-            document.getElementById('vidDesc').value = '';
-            document.getElementById('videoUrlInput').value = '';
+            const newVid = { id: Date.now(), title, desc, url: urlInput };
             
-            alert('تم نشر الفيديو على المنصة بنجاح! 🚀');
-            refreshPortalData();
+            firebase.database().ref('videos/' + newVid.id).set(newVid, (error) => {
+                if (!error) {
+                    alert('تم نشر الفيديو على المنصة وبقى ظاهر لكل الطلاب فوراً! 🚀');
+                    document.getElementById('vidTitle').value = '';
+                    document.getElementById('vidDesc').value = '';
+                    document.getElementById('videoUrlInput').value = '';
+                    refreshPortalData();
+                }
+            });
         }
 
         function deleteContent(id) {
-            let videos = JSON.parse(localStorage.getItem('yahiya_videos')) || [];
-            videos = videos.filter(item => item.id !== id);
-            localStorage.setItem('yahiya_videos', JSON.stringify(videos));
-            refreshPortalData();
+            firebase.database().ref('videos/' + id).remove().then(() => {
+                refreshPortalData();
+            });
         }
 
         function refreshOnlineListManually() {
@@ -1009,141 +1025,147 @@
                 }
             }
 
-            const videos = JSON.parse(localStorage.getItem('yahiya_videos')) || [];
             const liveData = JSON.parse(localStorage.getItem('yahiya_live')) || { active: false };
             const onlineUsers = JSON.parse(localStorage.getItem('yahiya_online')) || [];
             const chatSettings = JSON.parse(localStorage.getItem('yahiya_chat_settings')) || { groupChatEnabled: true };
 
-            if (isUserTeacher) {
-                const tFeed = document.getElementById('teacher-videos-feed');
-                if (tFeed) {
-                    tFeed.innerHTML = '';
-                    videos.forEach(item => {
-                        tFeed.innerHTML += `
-                            <div class="video-card">
-                                <div class="video-container">
-                                    <video src="${item.url}" controls controlsList="nodownload"></video>
-                                </div>
-                                <div class="video-info">
-                                    <h3>${item.title}</h3>
-                                    <p>${item.desc || ''}</p>
-                                    <button class="delete-btn" onclick="deleteContent(${item.id})">حذف الفيديو</button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
+            // جلب الفيديوهات من سرفر Firebase لتظهر على كل الأجهزة فوراً
+            firebase.database().ref('videos').once('value', (snapshot) => {
+                const data = snapshot.val();
+                const videos = data ? Object.values(data) : [];
 
-                const liveStatus = document.getElementById('live-status-text');
-                if (liveStatus) {
-                    liveStatus.innerText = liveData.active ? `حالة البث: يعمل (${liveData.type === 'group' ? 'جماعي' : 'فردي'}) 🔴` : "حالة البث: متوقف ⏹";
-                    liveStatus.style.color = liveData.active ? "#4CAF50" : "#ff5252";
-                }
-
-                const codesList = document.getElementById('codes-management-list');
-                if (codesList) {
-                    codesList.innerHTML = '';
-                    codes.forEach(c => {
-                        codesList.innerHTML += `
-                            <div class="code-row">
-                                <span><strong>${c.code}</strong> — الحالة: <span style="color:${c.status==='active'?'#4CAF50':(c.status==='suspended'?'#ff9800':'#ff5252')}">${c.status}</span></span>
-                                <div style="display:flex; gap:5px;">
-                                    <button class="logout-btn" style="color:#4CAF50; border-color:#4CAF50;" onclick="updateCodeStatus('${c.code}', 'active')">تفعيل</button>
-                                    <button class="logout-btn" style="color:#ff9800; border-color:#ff9800;" onclick="updateCodeStatus('${c.code}', 'suspended')">إيقاف</button>
-                                    <button class="logout-btn" onclick="updateCodeStatus('${c.code}', 'banned')">طرد</button>
+                if (isUserTeacher) {
+                    const tFeed = document.getElementById('teacher-videos-feed');
+                    if (tFeed) {
+                        tFeed.innerHTML = '';
+                        videos.forEach(item => {
+                            tFeed.innerHTML += `
+                                <div class="video-card">
+                                    <div class="video-container">
+                                        ${parseEmbedUrl(item.url)}
+                                    </div>
+                                    <div class="video-info">
+                                        <h3>${item.title}</h3>
+                                        <p>${item.desc || ''}</p>
+                                        <button class="delete-btn" onclick="deleteContent(${item.id})">حذف الفيديو</button>
+                                    </div>
                                 </div>
-                            </div>
-                        `;
-                    });
-                }
-
-                const onlineList = document.getElementById('teacher-online-list');
-                if (onlineList) {
-                    onlineList.innerHTML = '';
-                    if (onlineUsers.length === 0) {
-                        onlineList.innerHTML = '<p style="text-align:center; color:var(--text-gray); padding:20px;">لا توجد طلاب متواجدين..</p>';
-                    } else {
-                        onlineUsers.forEach(u => {
-                            onlineList.innerHTML += `
-                                <li class="online-item">
-                                    <span><strong>${u.name}</strong> ${u.role==='المعلم'?'<span class="verified-badge">✔</span>':''} (${u.phone})</span>
-                                    ${u.role !== 'المعلم' ? `<button class="logout-btn" onclick="banStudentByPhone('${u.phone}')">طرد الطالب ⛔</button>` : '<span style="color: #4CAF50; font-weight: bold;">● متصل</span>'}
-                                </li>
                             `;
                         });
                     }
-                }
 
-                const toggleEl = document.getElementById('groupChatToggle');
-                if (toggleEl && document.activeElement !== toggleEl) {
-                    toggleEl.checked = chatSettings.groupChatEnabled;
-                }
-
-            } else {
-                const sFeed = document.getElementById('student-video-feed');
-                if (sFeed) {
-                    sFeed.innerHTML = '';
-                    if(videos.length === 0) {
-                        sFeed.innerHTML = `<p style="text-align:center; color:var(--text-gray); padding: 30px;">لا توجد فيديوهات منشورة حالياً.</p>`;
+                    const liveStatus = document.getElementById('live-status-text');
+                    if (liveStatus) {
+                        liveStatus.innerText = liveData.active ? `حالة البث: يعمل (${liveData.type === 'group' ? 'جماعي' : 'فردي'}) 🔴` : "حالة البث: متوقف ⏹";
+                        liveStatus.style.color = liveData.active ? "#4CAF50" : "#ff5252";
                     }
-                    videos.forEach(item => {
-                        sFeed.innerHTML += `
-                            <div class="video-card">
-                                <div class="video-container">
-                                    <video src="${item.url}" controls controlsList="nodownload"></video>
-                                </div>
-                                <div class="video-info">
-                                    <h3>${item.title}</h3>
-                                    <p>${item.desc || ''}</p>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
 
-                const liveBox = document.getElementById('student-live-viewbox');
-                if (liveBox) {
-                    let canViewLive = false;
-                    if (liveData.active) {
-                        if (liveData.type === 'group') {
-                            canViewLive = true;
-                        } else if (liveData.type === 'private' && liveData.targetStudents.includes(currentUser.phone)) {
-                            canViewLive = true;
+                    const codesList = document.getElementById('codes-management-list');
+                    if (codesList) {
+                        codesList.innerHTML = '';
+                        codes.forEach(c => {
+                            codesList.innerHTML += `
+                                <div class="code-row">
+                                    <span><strong>${c.code}</strong> — الحالة: <span style="color:${c.status==='active'?'#4CAF50':(c.status==='suspended'?'#ff9800':'#ff5252')}">${c.status}</span></span>
+                                    <div style="display:flex; gap:5px;">
+                                        <button class="logout-btn" style="color:#4CAF50; border-color:#4CAF50;" onclick="updateCodeStatus('${c.code}', 'active')">تفعيل</button>
+                                        <button class="logout-btn" style="color:#ff9800; border-color:#ff9800;" onclick="updateCodeStatus('${c.code}', 'suspended')">إيقاف</button>
+                                        <button class="logout-btn" onclick="updateCodeStatus('${c.code}', 'banned')">طرد</button>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    const onlineList = document.getElementById('teacher-online-list');
+                    if (onlineList) {
+                        onlineList.innerHTML = '';
+                        if (onlineUsers.length === 0) {
+                            onlineList.innerHTML = '<p style="text-align:center; color:var(--text-gray); padding:20px;">لا توجد طلاب متواجدين..</p>';
+                        } else {
+                            onlineUsers.forEach(u => {
+                                onlineList.innerHTML += `
+                                    <li class="online-item">
+                                        <span><strong>${u.name}</strong> ${u.role==='المعلم'?'<span class="verified-badge">✔</span>':''} (${u.phone})</span>
+                                        ${u.role !== 'المعلم' ? `<button class="logout-btn" onclick="banStudentByPhone('${u.phone}')">طرد الطالب ⛔</button>` : '<span style="color: #4CAF50; font-weight: bold;">● متصل</span>'}
+                                    </li>
+                                `;
+                            });
                         }
                     }
 
-                    if (canViewLive) {
-                        liveBox.className = "live-box active-live";
-                        liveBox.innerHTML = `
-                            <h3>البث المباشر يعمل الآن! 🔴</h3>
-                            <p style="margin: 10px 0 15px; color: var(--text-gray);">مستر يحيى يبث الحصة صوت وصورة.</p>
-                            <video id="studentLiveView" autoplay playsinline class="live-stream-screen" controls></video>
-                        `;
-                        const studentView = document.getElementById('studentLiveView');
-                        if (localStream && studentView && !studentView.srcObject) {
-                            studentView.srcObject = localStream;
-                        }
-                    } else {
-                        liveBox.className = "live-box";
-                        liveBox.innerHTML = `
-                            <h3>لا يوجد بث مباشر متاح لك حالياً</h3>
-                            <p style="color: var(--text-gray); margin-top: 10px;">سيظهر البث تلقائياً فور بدء المعلم.</p>
-                        `;
+                    const toggleEl = document.getElementById('groupChatToggle');
+                    if (toggleEl && document.activeElement !== toggleEl) {
+                        toggleEl.checked = chatSettings.groupChatEnabled;
                     }
-                }
 
-                const studentInputContainer = document.getElementById('studentChatInputContainer');
-                if (studentInputContainer) {
-                    if (activeChatTarget === 'group' && !chatSettings.groupChatEnabled) {
-                        studentInputContainer.innerHTML = `<p style="color:#ff5252; font-size:13px; text-align:center; width:100%;">الشات الجماعي مغلق كتابةً من المعلم حالياً.</p>`;
-                    } else if (!studentInputContainer.querySelector('input')) {
-                        studentInputContainer.innerHTML = `
-                            <input type="text" id="chatInputText" placeholder="اكتب رسالتك هنا..." onkeydown="if(event.key==='Enter') sendChatMessage()">
-                            <button class="btn" style="width: 90px; background-color: #00a884;" onclick="sendChatMessage()">إرسال</button>
-                        `;
+                } else {
+                    const sFeed = document.getElementById('student-video-feed');
+                    if (sFeed) {
+                        sFeed.innerHTML = '';
+                        if(videos.length === 0) {
+                            sFeed.innerHTML = `<p style="text-align:center; color:var(--text-gray); padding: 30px;">لا توجد فيديوهات منشورة حالياً.</p>`;
+                        }
+                        videos.forEach(item => {
+                            sFeed.innerHTML += `
+                                <div class="video-card">
+                                    <div class="video-container">
+                                        ${parseEmbedUrl(item.url)}
+                                    </div>
+                                    <div class="video-info">
+                                        <h3>${item.title}</h3>
+                                        <p>${item.desc || ''}</p>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    const liveBox = document.getElementById('student-live-viewbox');
+                    if (liveBox) {
+                        let canViewLive = false;
+                        if (liveData.active) {
+                            if (liveData.type === 'group') {
+                                canViewLive = true;
+                            } else if (liveData.type === 'private' && liveData.targetStudents.includes(currentUser.phone)) {
+                                canViewLive = true;
+                            }
+                        }
+
+                        if (canViewLive) {
+                            liveBox.className = "live-box active-live";
+                            liveBox.innerHTML = `
+                                <h3>البث المباشر يعمل الآن! 🔴</h3>
+                                <p style="margin: 10px 0 15px; color: var(--text-gray);">مستر يحيى يبث الحصة صوت وصورة.</p>
+                                <video id="studentLiveView" autoplay playsinline class="live-stream-screen" controls></video>
+                            `;
+                            const studentView = document.getElementById('studentLiveView');
+                            if (localStream && studentView && !studentView.srcObject) {
+                                studentView.srcObject = localStream;
+                            }
+                        } else {
+                            liveBox.className = "live-box";
+                            liveBox.innerHTML = `
+                                <h3>لا يوجد بث مباشر متاح لك حالياً</h3>
+                                <p style="color: var(--text-gray); margin-top: 10px;">سيظهر البث تلقائياً فور بدء المعلم.</p>
+                            `;
+                        }
+                    }
+
+                    const studentInputContainer = document.getElementById('studentChatInputContainer');
+                    if (studentInputContainer) {
+                        if (activeChatTarget === 'group' && !chatSettings.groupChatEnabled) {
+                            studentInputContainer.innerHTML = `<p style="color:#ff5252; font-size:13px; text-align:center; width:100%;">الشات الجماعي مغلق كتابةً من المعلم حالياً.</p>`;
+                        } else if (!studentInputContainer.querySelector('input')) {
+                            studentInputContainer.innerHTML = `
+                                <input type="text" id="chatInputText" placeholder="اكتب رسالتك هنا..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                                <button class="btn" style="width: 90px; background-color: #00a884;" onclick="sendChatMessage()">إرسال</button>
+                            `;
+                        }
                     }
                 }
-            }
+            });
+
             renderChatMessages();
         }
 
