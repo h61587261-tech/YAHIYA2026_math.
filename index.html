@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>منصة مستر يحيى البنا - رياضيات المحلة</title>
-    <!-- مكتبات الفايربيز -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -207,7 +206,7 @@
             width: 100%;
             background: #000;
             position: relative;
-            max-height: 450px;
+            aspect-ratio: 16/9;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -215,8 +214,11 @@
 
         .video-container video {
             width: 100%;
-            max-height: 450px;
+            height: 100%;
+            border: none;
             outline: none;
+            object-fit: contain;
+            background: #000;
         }
 
         .video-info {
@@ -247,23 +249,6 @@
         .delete-btn:hover {
             background: #ff5252;
             color: white;
-        }
-
-        .fullscreen-btn {
-            background: #2196F3;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-top: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .fullscreen-btn:hover {
-            background: #0b7dda;
         }
 
         .live-box {
@@ -613,7 +598,7 @@
                 contentsContainer.innerHTML = `
                     <div id="teacher-videos" class="tab-content active">
                         <h3>نشر الفيديوهات والحصص للمنصة</h3>
-                        <p style="color:var(--text-gray); margin: 10px 0 20px;">اكتب عنوان الدرس ووصفه، ثم حط رابط الفيديو المباشر (مثل روابط تيليجرام أو روابط مباشرة) ليظهر للطلاب مع زر تكبير الشاشة.</p>
+                        <p style="color:var(--text-gray); margin: 10px 0 20px;">اكتب عنوان الدرس ووصفه، ثم حط الرابط المباشر لجوجل درايف.</p>
                         <div class="form-group">
                             <input type="text" id="vidTitle" placeholder="عنوان الدرس (مثال: حصة التفاضل)">
                         </div>
@@ -621,18 +606,18 @@
                             <input type="text" id="vidDesc" placeholder="وصف صغير تحت الفيديو">
                         </div>
                         <div class="form-group">
-                            <label>رابط الفيديو المباشر (تيليجرام أو رابط مباشر):</label>
-                            <input type="text" id="videoUrlInput" placeholder="https://..." style="background:#222; padding:12px;">
+                            <label>رابط الفيديو المباشر:</label>
+                            <input type="text" id="videoUrlInput" placeholder="https://lh3.googleusercontent.com/d/..." style="background:#222; padding:12px;">
                         </div>
                         <button class="btn" onclick="uploadVideoFromFile()">نشر الفيديو للمنصة 🚀</button>
 
-                        <h3 style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">الفيديوهات المرفوعة:</h3>
+                        <h3 style="margin-top: 30px; border-top: 1px solid #333; paddingTop: 20px;">الفيديوهات المرفوعة:</h3>
                         <div class="video-feed" id="teacher-videos-feed" style="margin-top: 15px;"></div>
                     </div>
 
                     <div id="teacher-live" class="tab-content">
                         <h3>استوديو البث المباشر (صوت وصورة عالية الجودة)</h3>
-                        <p style="color:var(--text-gray); margin: 10px 0 15px;">اختر نوع البث (جماعي أو فردي لطلاب محددين) وابدأ البث مباشرة.</p>
+                        <p style="color:var(--text-gray); margin: 10px 0 15px;">اختر نوع البث وابدأ البث مباشرة.</p>
                         
                         <div class="settings-box">
                             <div class="form-group">
@@ -684,7 +669,7 @@
 
                     <div id="teacher-codes" class="tab-content">
                         <h3>إدارة الأكواد السرية للطلاب</h3>
-                        <p style="color:var(--text-gray); margin: 10px 0 15px;">توليد وإدارة حالة الأكواد (إيقاف مؤقت أو طرد نهائي):</p>
+                        <p style="color:var(--text-gray); margin: 10px 0 15px;">توليد وإدارة حالة الأكواد:</p>
                         <button class="btn" style="max-width: 250px;" onclick="generateStudentCode()">توليد كود جديد 🔑</button>
                         <div id="generated-code-box" style="margin-top: 15px; font-size: 16px; color: var(--primary-red); font-weight: bold;"></div>
                         
@@ -763,7 +748,7 @@
             const urlInput = document.getElementById('videoUrlInput').value.trim();
 
             if (!title || !urlInput) {
-                alert('الرجاء كتابة العنوان ووضع رابط الفيديو المباشر.');
+                alert('الرجاء كتابة العنوان ووضع الرابط المباشر.');
                 return;
             }
 
@@ -775,7 +760,7 @@
             document.getElementById('vidDesc').value = '';
             document.getElementById('videoUrlInput').value = '';
             
-            alert('تم نشر الفيديو على المنصة بنجاح لجميع الطلاب! 🚀');
+            alert('تم نشر الفيديو على المنصة بنجاح! 🚀');
             refreshPortalData();
         }
 
@@ -784,17 +769,6 @@
             videos = videos.filter(item => item.id !== id);
             localStorage.setItem('yahiya_videos', JSON.stringify(videos));
             refreshPortalData();
-        }
-
-        function toggleFullscreen(videoId) {
-            const videoEl = document.getElementById(videoId);
-            if (videoEl.requestFullscreen) {
-                videoEl.requestFullscreen();
-            } else if (videoEl.webkitRequestFullscreen) {
-                videoEl.webkitRequestFullscreen();
-            } else if (videoEl.msRequestFullscreen) {
-                videoEl.msRequestFullscreen();
-            }
         }
 
         function refreshOnlineListManually() {
@@ -853,7 +827,7 @@
                 alert('تم فتح الكاميرا وبدء البث المباشر بنجاح!');
                 refreshPortalData();
             } catch (error) {
-                alert('عذراً، لم نتمكن من الوصول للكاميرا. تأكد من السماح للأذونات من المتصفح.');
+                alert('عذراً، لم نتمكن من الوصول للكاميرا. تأكد من السماح للأذونات.');
             }
         }
 
@@ -883,9 +857,7 @@
             let codes = JSON.parse(localStorage.getItem('yahiya_codes')) || [];
             codes = codes.map(c => {
                 if (c.code === codeVal) {
-                    if (action === 'active') c.status = 'active';
-                    else if (action === 'suspended') c.status = 'suspended';
-                    else if (action === 'banned') c.status = 'banned';
+                    c.status = action;
                 }
                 return c;
             });
@@ -907,7 +879,7 @@
                 localStorage.setItem('yahiya_codes', JSON.stringify(codes));
                 onlineUsers = onlineUsers.filter(u => u.phone !== studentPhone);
                 localStorage.setItem('yahiya_online', JSON.stringify(onlineUsers));
-                alert(`تم طرد الطالب ${targetUser.name} نهائياً ولن يتمكن من الدخول مجدداً.`);
+                alert(`تم طرد الطالب ${targetUser.name} نهائياً.`);
                 refreshPortalData();
             }
         }
@@ -1031,7 +1003,7 @@
             if (!isUserTeacher) {
                 const myCodeObj = codes.find(c => c.code === currentUser.codeUsed);
                 if (myCodeObj && (myCodeObj.status === 'banned' || myCodeObj.status === 'suspended')) {
-                    alert('إمشي يا مطرود! تم طردك نهائياً من المنصة ولا يمكنك الدخول.');
+                    alert('إمشي يا مطرود! تم طردك نهائياً من المنصة.');
                     logoutUser();
                     return;
                 }
@@ -1050,12 +1022,11 @@
                         tFeed.innerHTML += `
                             <div class="video-card">
                                 <div class="video-container">
-                                    <video id="vid-${item.id}" controls src="${item.url}" playsinline></video>
+                                    <video src="${item.url}" controls controlsList="nodownload"></video>
                                 </div>
                                 <div class="video-info">
                                     <h3>${item.title}</h3>
                                     <p>${item.desc || ''}</p>
-                                    <button class="fullscreen-btn" onclick="toggleFullscreen('vid-${item.id}')">⛶ تكبير الشاشة</button>
                                     <button class="delete-btn" onclick="deleteContent(${item.id})">حذف الفيديو</button>
                                 </div>
                             </div>
@@ -1065,7 +1036,7 @@
 
                 const liveStatus = document.getElementById('live-status-text');
                 if (liveStatus) {
-                    liveStatus.innerText = liveData.active ? `حالة البث: يعمل (${liveData.type === 'group' ? 'جماعي' : 'فردي مخصص'}) 🔴` : "حالة البث: متوقف ⏹";
+                    liveStatus.innerText = liveData.active ? `حالة البث: يعمل (${liveData.type === 'group' ? 'جماعي' : 'فردي'}) 🔴` : "حالة البث: متوقف ⏹";
                     liveStatus.style.color = liveData.active ? "#4CAF50" : "#ff5252";
                 }
 
@@ -1078,8 +1049,8 @@
                                 <span><strong>${c.code}</strong> — الحالة: <span style="color:${c.status==='active'?'#4CAF50':(c.status==='suspended'?'#ff9800':'#ff5252')}">${c.status}</span></span>
                                 <div style="display:flex; gap:5px;">
                                     <button class="logout-btn" style="color:#4CAF50; border-color:#4CAF50;" onclick="updateCodeStatus('${c.code}', 'active')">تفعيل</button>
-                                    <button class="logout-btn" style="color:#ff9800; border-color:#ff9800;" onclick="updateCodeStatus('${c.code}', 'suspended')">إيقاف مؤقت</button>
-                                    <button class="logout-btn" onclick="updateCodeStatus('${c.code}', 'banned')">إيقاف نهائي</button>
+                                    <button class="logout-btn" style="color:#ff9800; border-color:#ff9800;" onclick="updateCodeStatus('${c.code}', 'suspended')">إيقاف</button>
+                                    <button class="logout-btn" onclick="updateCodeStatus('${c.code}', 'banned')">طرد</button>
                                 </div>
                             </div>
                         `;
@@ -1090,7 +1061,7 @@
                 if (onlineList) {
                     onlineList.innerHTML = '';
                     if (onlineUsers.length === 0) {
-                        onlineList.innerHTML = '<p style="text-align:center; color:var(--text-gray); padding:20px;">لا توجد طلاب متواجدين الآن..</p>';
+                        onlineList.innerHTML = '<p style="text-align:center; color:var(--text-gray); padding:20px;">لا توجد طلاب متواجدين..</p>';
                     } else {
                         onlineUsers.forEach(u => {
                             onlineList.innerHTML += `
@@ -1119,12 +1090,11 @@
                         sFeed.innerHTML += `
                             <div class="video-card">
                                 <div class="video-container">
-                                    <video id="vid-${item.id}" controls src="${item.url}" playsinline></video>
+                                    <video src="${item.url}" controls controlsList="nodownload"></video>
                                 </div>
                                 <div class="video-info">
                                     <h3>${item.title}</h3>
                                     <p>${item.desc || ''}</p>
-                                    <button class="fullscreen-btn" onclick="toggleFullscreen('vid-${item.id}')">⛶ تكبير الشاشة</button>
                                 </div>
                             </div>
                         `;
